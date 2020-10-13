@@ -1,5 +1,8 @@
 pragma solidity ^0.5.0; // ^0.6.6;
 
+
+pragma solidity ^0.5.0; // ^0.6.6;
+
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v2.5.0/contracts/token/ERC20/ERC20.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v2.5.0/contracts/token/ERC20/ERC20Detailed.sol";
 
@@ -8,6 +11,9 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v2.5.0/contr
   ** NOTE : APART FROM LOGIC IMPLEMENTATION, FOLLOWING THINGS NEEDS TO BE IMPLEMENTED : 
     1. CONVERT INTO UPGRADABLE SMART CONTRACT
     2. ERC20 COMPLIANT
+    
+    0x3643b7a9F6338115159a4D3a2cc678C99aD657aa   data
+    
 
 */
 
@@ -28,15 +34,11 @@ contract MultiSignContractUpgradable { // main contract and will contain the ref
             return obj.getOwnerAddress();
     }
     
-    function depositWEI(uint256 value, bytes memory data) public {
-        obj.depositWEI(value, data);
+    function depositWEI() payable public returns(uint) {
+        obj.depositWEI(msg.sender);
     }
-    
-    function getBalance() public view returns (uint256) { //
-        return obj.getBalance();
-    }
-    
-    function requestForWithdrawal(uint value,bytes memory data)
+
+    function requestForWithdrawal(uint value,string memory data)
         public 
         returns (string memory)
     {
@@ -53,31 +55,93 @@ contract MultiSignContractUpgradable { // main contract and will contain the ref
     function transferAmount(uint txid) 
         public 
         payable
-        returns(string memory)
+      //  returns(string memory)
+        returns(address)
     {
-        return obj.transferAmount(txid);
+        return obj.transferAmount(msg.sender, txid);
     }
     
-    function addTransaction(address destination, uint value, bytes memory data, string memory transType, string memory _creationDate)
-        internal
-        returns (uint transactionId)
-    {
-        return obj.addTransaction(destination, value,data, transType,_creationDate);
-        
-    }
-    
-    
-    function submitTransaction(address destination, uint value,  bytes memory data)
+    function submitTransaction(address destination, uint value,  string memory data)
         public
         returns (uint transactionId)
     {
-        transactionId = addTransaction(destination, value, data,"transtype","2020/10/10");
+       // submitTransaction(address destination, uint value, string memory data)
+        transactionId = obj.submitTransaction(msg.sender, value, data);
       //  confirmTransaction(transactionId);
     }
     
+    function getContractBalance() public view returns (uint256) { 
+        return address(this).balance;
+    }
+    
+    
+    /*
+    
+    
+     function addTransaction(uint value, string memory data, string memory transType, string memory _creationDate) //not required
+        internal
+        returns (uint transactionId)
+    {
+        return obj.addTransaction(msg.sender, value,data, transType,_creationDate);
+        
+    }
+    
+      function getContractBalanceData() public view returns(uint256) { //test
+       return obj.getContractBalance();
+    }
+    
+
+    function getContractAddressData() public view returns(address) { //test
+       return obj.getCallingAddr();
+    }
+    
+    function getCallingAddrDataBal() public view returns(uint) { //test
+       return obj.getBalance();
+    }
+    
+    function getCallingAddr() public view returns(address) { //test
+       return msg.sender;
+    }
+    
+    function getContractBalance() public view returns (uint256) { 
+        return address(this).balance;
+    }
+    
+     function getContractBalanceData() public view returns(uint256) { //test
+       return obj.getContractBalance();
+    }
+    
+    
+    0xb3502940731B7a65F9bbDB73369c7729c8197665
+    0xb3502940731B7a65F9bbDB73369c7729c8197665
+    
+    -- 
+    0xc5266CA19406253Bd9659c5689cC6dfcFd4633A8 data
+    0x0B2f1fc73fd95d53Ef57af3Ca4155EC97725350d
+    
+    0xc77e7328722F996Acd268b5Ac786e94120339A7F  data
+    0x300320319533473E6df7fbbBac1B81ed864Ccf58
+    
+    */
+    
+
+    
+    
+    function getContractAddress() public view returns(address) { //test
+       return msg.sender;
+    }
+    
+    function getAddressBalance(address _addr) public view returns(uint) { //test
+       return obj.getAddressBalance(_addr);
+    }
+    
+     function getTxBalance(uint _txid) public view returns(uint) { //test
+       return obj.getTxBalance(_txid);
+    }
     
     
 }
+
 
 contract MultiSignContractDataStore {  // will contain all the methods and logic
     
@@ -87,7 +151,8 @@ contract MultiSignContractDataStore {  // will contain all the methods and logic
       struct Transaction {
             address destination;
             uint value;
-            bytes data;
+            string data;
+            // bytes data;
            // string currentState;
            string tranType;
             bool executed;
@@ -95,15 +160,6 @@ contract MultiSignContractDataStore {  // will contain all the methods and logic
             string currentState;
             string creationDate;
     }
-    
-     constructor() public {
-        ownerAddr =msg.sender;
-    }
-    
-	function getOwnerAddress() public view returns (address) {
-        return ownerAddr;
-    }
-    
     
      //Other data structs.
     
@@ -126,10 +182,10 @@ contract MultiSignContractDataStore {  // will contain all the methods and logic
     uint public transactionCount=100;
     
     //max no of wei
-    uint256 maxWEI = 32000000000000000000;   //equivalent to 32 ethers
+    uint256 maxWEI = 32000000000000000000 wei;   //equivalent to 32 ethers
     
     //current no,. of wei
-    uint256 curWEI = 0;
+    uint256 curWEI = 16000000000000000000 wei; // for testing purpose
     
     // transaction related data structs
  
@@ -141,28 +197,51 @@ contract MultiSignContractDataStore {  // will contain all the methods and logic
     //between txid and address,to know who has confirmed the transactions.
     mapping(uint => address[]) scores; 
     
+    //between txid and balance.
+    mapping(uint => uint) txidBalance; 
+    
     //ERC20 standards.
   // 1. Zeppelin standards.
   // 2. 
   
+  
+    constructor() public {
+        ownerAddr =msg.sender;
+    }
     
-    //function depositWEI(address destination, uint256 value, bytes memory data)  
-    function depositWEI(uint256 value, bytes memory data)  
-        public
-        returns(uint transactionId)
-    {
-        require(curWEI == maxWEI);
-        require(isRegUser[msg.sender]);
-        curWEI = curWEI + value;
-        tokensDeposited[msg.sender] = value;
+	function getOwnerAddress() public view returns (address) {
+        return ownerAddr;
+    }
+    
+    function getContractBalance() public view returns(uint256) { //test
+       return address(this).balance; //address(this).balance;
+    }
+    
+    function getContractAddress() public view returns(address) { //test
+       return address(this);
     }
 
-    function getBalance() public view returns (uint256) { //
-        return address(this).balance;
+    function depositWEI(address _addr)  
+        payable public
+        returns(uint)
+    {
+        require(curWEI < maxWEI); 
+       // require(isRegUser[msg.sender]); //commented for the testing purpose
+        curWEI = curWEI + msg.value;//value;
+        tokensDeposited[_addr] = msg.value;
+        return _addr.balance;
     }
     
-    
-    function requestForWithdrawal(uint value,bytes memory data)
+
+    function getCallingAddr() public view returns(address) { //test
+       return msg.sender;
+    }
+
+    function getBalance() public view returns (uint) { //
+        return address(this).balance;
+    }
+
+    function requestForWithdrawal(uint value,string memory data)
         public 
         returns (string memory)
     {
@@ -197,33 +276,40 @@ contract MultiSignContractDataStore {  // will contain all the methods and logic
         
     }
     
-    function transferAmount(uint txid) 
+    //0x5B38Da6a701c568545dCfcB03FcB875f56beddC4   99999999999993641749
+    //
+    
+    function transferAmount(address _addr, uint txid) //to be tested next.
         public 
-        payable
-        returns(string memory)
+      //  payable
+        returns(address)
     {
         
-        require(transactions[txid].confirmCount >= 16); //51% of 32
+       // require(transactions[txid].confirmCount >= 16); //51% of 32  commented for testing purpose
         
-        //transfering the amount back to the 
-        msg.sender.transfer(address(transactions[txid].destination).balance); 
+        //deducting the amount from the contract balance
+       // msg.sender.transfer(transactions[txid].value); //from contract to address
         
         //converting address to address payable
-        address payable payableDestAddr =  address(uint160(transactions[txid].destination)); //payable(transactions[txid].destination); //address(uint160(transactions[txid].destination)); 
-        payableDestAddr.transfer(transactions[txid].value);
-        curWEI= curWEI - transactions[txid].value;
-        return "Tokens transfer done";
+       // address payable payableDestAddr =  address(uint160(transactions[txid].destination)); //payable(transactions[txid].destination); //address(uint160(transactions[txid].destination)); 
+        
+        //payableDestAddr.transfer(transactions[txid].value);
+       // curWEI= curWEI - transactions[txid].value;
+       // return "Tokens transfer done";
+       
+      address(uint160(_addr)).transfer(transactions[txid].value);
+       return _addr;
         
     }
     
     
-    function addTransaction(address destination, uint value, bytes memory data, string memory transType, string memory _creationDate)
+    function addTransaction(address destination, uint value, string memory data, string memory transType, string memory _creationDate)
         public
         returns (uint transactionId)
     {
         transactionId = transactionCount;
         transactions[transactionId] = Transaction({
-            destination: destination,
+            destination: destination, //address which deposited the ethers/wei
             value: value,
             data: data,
             tranType: transType,
@@ -232,20 +318,34 @@ contract MultiSignContractDataStore {  // will contain all the methods and logic
             currentState: "New",
             creationDate: _creationDate
         });
+        uint curTnxid = transactionCount;
         transactionCount += 1;
+        return curTnxid;
         //Submission(transactionId);
     }
     
-    
-    function submitTransaction(address destination, uint value,  bytes memory data)
+  
+    function submitTransaction(address destination, uint value, string memory data)
         public
         returns (uint transactionId)
     {
         transactionId = addTransaction(destination, value, data,"transtype","2020/10/10");
+        return transactionId;
       //  confirmTransaction(transactionId);
     }
     
+    function getAddressBalance(address _addr) public view returns(uint) { //test
+       return _addr.balance;
+    }
+    
+    function getTxBalance(uint _txid) public view returns(uint256) { //test
+          return  transactions[_txid].value;
+      // return obj.getAddressBalance(_addr);
+    }
+    
+    
 }
+
 
 /*
 contract MultiSignWalletCon {
@@ -311,18 +411,21 @@ contract MultiSignWalletCon {
     }
     
     //function depositWEI(address destination, uint256 value, bytes memory data)  
-    function depositWEI(uint256 value, bytes memory data)  
-        public
-        returns(uint transactionId)
+    function depositWEI(uint value)  
+        payable public
+        returns(uint)
     {
-        require(curWEI == maxWEI);
-        require(isRegUser[msg.sender]);
+       // require(curWEI == maxWEI);
+      //  require(isRegUser[msg.sender]);
         curWEI = curWEI + value;
         tokensDeposited[msg.sender] = value;
-    }
-
-    function getBalance() public view returns (uint256) { //
         return address(this).balance;
+    }
+    
+     function depositToContract(uint value) public payable returns (uint) {
+        //balances[msg.sender] += msg.value;
+        //emit LogDepositMade(msg.sender, msg.value);
+        //return balances[msg.sender];
     }
     
     
@@ -409,5 +512,16 @@ contract MultiSignWalletCon {
       //  confirmTransaction(transactionId);
     }
     
+     function getCallingAddr() public view returns(address) { //test
+       return msg.sender;
+    }
+
+
+    function getBalance() public view returns (uint) { // test
+        return address(this).balance;
+    }
+    
+
 }
+
 */
